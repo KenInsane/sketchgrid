@@ -1,0 +1,12 @@
+# тестовые картинки и результаты рендера — в репозиторий не нужны
+Image_*.jpg
+*_ref.jpg
+*_ref.png
+*_paper.svg
+_out/
+_test/
+
+# системное
+Thumbs.db
+desktop.ini
+.DS_Store

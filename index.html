@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sketch Grid — сетка для переноса на бумагу</title>
+<style>
+  :root{
+    --bg:#14151a; --bg2:#1b1d24; --bg3:#23262f; --line:#31343f;
+    --fg:#e8e9ee; --fg2:#9aa0b0; --fg3:#6b7183;
+    --acc:#ff6a3d; --acc2:#ffb02e; --ok:#4ade80;
+    --r:10px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--fg);
+    font:14px/1.45 "Inter","Segoe UI",system-ui,-apple-system,sans-serif;
+    -webkit-text-size-adjust:100%; overscroll-behavior:none;
+  }
+  .app{display:grid; grid-template-columns:340px 1fr; height:100dvh}
+  @media (max-width:900px){ .app{grid-template-columns:1fr; grid-template-rows:auto 1fr; height:auto; min-height:100dvh} }
+
+  /* ---------- panel ---------- */
+  .panel{background:var(--bg2); border-right:1px solid var(--line); overflow-y:auto; padding:14px 14px 40px; -webkit-overflow-scrolling:touch}
+  @media (max-width:900px){ .panel{border-right:0; border-bottom:1px solid var(--line); max-height:none; order:2} }
+  .brand{display:flex; align-items:baseline; gap:8px; margin:2px 0 14px}
+  .brand b{font-size:16px; letter-spacing:.02em}
+  .brand span{font-size:11px; color:var(--fg3)}
+
+  fieldset{border:1px solid var(--line); border-radius:var(--r); margin:0 0 12px; padding:10px 12px 12px; background:var(--bg)}
+  legend{font-size:11px; text-transform:uppercase; letter-spacing:.09em; color:var(--acc2); padding:0 6px}
+  .row{display:flex; gap:8px; align-items:center; margin:8px 0}
+  .row:first-of-type{margin-top:2px}
+  .row > label{flex:0 0 96px; color:var(--fg2); font-size:12px}
+  .row.wide > label{flex:0 0 auto}
+  .grow{flex:1; min-width:0}
+
+  input[type=number], input[type=text], select{
+    background:var(--bg3); color:var(--fg); border:1px solid var(--line);
+    border-radius:7px; padding:6px 8px; font:inherit; font-size:13px; width:100%; min-width:0;
+  }
+  input[type=color]{background:var(--bg3); border:1px solid var(--line); border-radius:7px; width:38px; height:30px; padding:2px}
+  input[type=range]{width:100%; accent-color:var(--acc)}
+  input:focus,select:focus{outline:2px solid var(--acc); outline-offset:-1px}
+
+  .seg{display:flex; background:var(--bg3); border:1px solid var(--line); border-radius:7px; overflow:hidden; flex:1}
+  .seg button{flex:1; background:none; border:0; color:var(--fg2); padding:6px 4px; font:inherit; font-size:12px; cursor:pointer; white-space:nowrap}
+  .seg button.on{background:var(--acc); color:#15161a; font-weight:600}
+  .seg button+button{border-left:1px solid var(--line)}
+
+  .chk{display:flex; align-items:center; gap:7px; font-size:12.5px; color:var(--fg2); cursor:pointer; padding:3px 0}
+  .chk input{accent-color:var(--acc); width:15px; height:15px; flex:0 0 auto}
+  .chks{display:grid; grid-template-columns:1fr 1fr; gap:0 10px}
+
+  button.btn{
+    background:var(--bg3); color:var(--fg); border:1px solid var(--line); border-radius:8px;
+    padding:9px 10px; font:inherit; font-size:13px; cursor:pointer; width:100%; transition:.12s;
+  }
+  button.btn:hover{border-color:var(--acc); color:#fff}
+  button.btn.primary{background:var(--acc); border-color:var(--acc); color:#15161a; font-weight:600}
+  button.btn.primary:hover{filter:brightness(1.1)}
+  button.btn:disabled{opacity:.4; cursor:not-allowed}
+  .btns{display:grid; gap:7px}
+  .btns.two{grid-template-columns:1fr 1fr}
+
+  .drop{
+    border:1.5px dashed var(--line); border-radius:var(--r); padding:16px 10px; text-align:center;
+    color:var(--fg3); font-size:12.5px; cursor:pointer; transition:.15s; background:var(--bg)
+  }
+  .drop:hover,.drop.hot{border-color:var(--acc); color:var(--fg2); background:#1e2027}
+  .drop b{display:block; color:var(--fg); font-size:13.5px; margin-bottom:3px}
+
+  /* ---------- stage ---------- */
+  .stage{display:flex; flex-direction:column; min-width:0; min-height:0; background:
+     radial-gradient(1100px 600px at 50% 0%, #1c1e26 0%, #101116 70%)}
+  @media (max-width:900px){ .stage{order:1; height:70dvh} }
+  .canvasWrap{flex:1; display:flex; align-items:center; justify-content:center; padding:16px; min-height:0; position:relative}
+  #view{
+    max-width:100%; max-height:100%; box-shadow:0 14px 50px rgba(0,0,0,.6), 0 0 0 1px #000;
+    border-radius:2px; touch-action:none; cursor:grab; background:#fff
+  }
+  #view.drag{cursor:grabbing}
+  .hint{position:absolute; left:50%; bottom:8px; transform:translateX(-50%); font-size:11px; color:var(--fg3); pointer-events:none; text-align:center}
+
+  .readout{
+    border-top:1px solid var(--line); background:var(--bg2); padding:10px 14px;
+    display:flex; flex-wrap:wrap; gap:8px 10px; align-items:stretch;
+  }
+  .stat{background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:6px 10px; min-width:0}
+  .stat i{display:block; font-style:normal; font-size:10px; letter-spacing:.07em; text-transform:uppercase; color:var(--fg3)}
+  .stat b{display:block; font-size:14px; font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap}
+  .stat.hero{border-color:var(--acc); background:#241a15}
+  .stat.hero b{color:var(--acc2)}
+  .warn{color:#ff8a5c}
+
+  details.help{border:1px solid var(--line); border-radius:var(--r); background:var(--bg); padding:0 12px}
+  details.help summary{cursor:pointer; padding:10px 0; font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--acc2)}
+  details.help ol{margin:0 0 12px; padding-left:18px; color:var(--fg2); font-size:12.5px}
+  details.help li{margin:5px 0}
+  details.help code{background:var(--bg3); padding:1px 5px; border-radius:4px; color:var(--fg); font-size:12px}
+
+  .err{color:#ff7a7a; font-size:12px; margin-top:8px; display:none}
+
+  /* ---------- print ---------- */
+  #printRoot{display:none}
+  @media print{
+    body{background:#fff}
+    body > *:not(#printRoot){display:none !important}
+    #printRoot{display:block}
+    #printRoot img{display:block; margin:0}
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ======================= CONTROLS ======================= -->
+  <aside class="panel">
+    <div class="brand"><b>Sketch&nbsp;Grid</b><span>картинка → сетка → бумага</span></div>
+
+    <fieldset>
+      <legend>1 · Изображение</legend>
+      <div class="drop" id="drop">
+        <b>Перетащи файл сюда</b>
+        нажми, чтобы выбрать · или Ctrl/⌘+V из буфера
+      </div>
+      <input type="file" id="file" accept="image/*" hidden>
+      <div class="row" style="margin-top:9px">
+        <label>Кадр</label>
+        <div class="seg" id="segFit">
+          <button data-v="cover" class="on">Заполнить</button>
+          <button data-v="contain">Вписать</button>
+        </div>
+      </div>
+      <div class="row"><label>Масштаб</label><input type="range" id="zoom" min="0.2" max="6" step="0.01" value="1"></div>
+      <div class="btns two" style="margin-top:8px">
+        <button class="btn" id="rot">Повернуть 90°</button>
+        <button class="btn" id="reset">Сброс кадра</button>
+      </div>
+      <div class="err" id="err"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>2 · Бумага</legend>
+      <div class="row"><label>Формат</label>
+        <select id="paper" class="grow">
+          <option value="A3">A3 — 297 × 420 мм</option>
+          <option value="A4" selected>A4 — 210 × 297 мм</option>
+          <option value="A5">A5 — 148 × 210 мм</option>
+          <option value="A2">A2 — 420 × 594 мм</option>
+          <option value="custom">Свой размер…</option>
+        </select>
+      </div>
+      <div class="row" id="rowCustom" style="display:none">
+        <label>Ш × В, мм</label>
+        <input type="number" id="cw" value="210" min="40" max="2000" step="1" class="grow">
+        <input type="number" id="ch" value="297" min="40" max="2000" step="1" class="grow">
+      </div>
+      <div class="row"><label>Ориентация</label>
+        <div class="seg" id="segOrient">
+          <button data-v="portrait" class="on">Портрет</button>
+          <button data-v="landscape">Альбом</button>
+        </div>
+      </div>
+      <div class="row"><label>Поля, мм</label><input type="number" id="margin" value="12" min="0" max="60" step="1"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>3 · Сетка</legend>
+      <div class="row"><label>Задать</label>
+        <div class="seg" id="segMode">
+          <button data-v="cell" class="on">Размером клетки</button>
+          <button data-v="cols">Числом клеток</button>
+        </div>
+      </div>
+      <div class="row" id="rowCell"><label>Клетка, мм</label><input type="number" id="cell" value="20" min="3" max="120" step="1"></div>
+      <div class="row" id="rowCols" style="display:none"><label>По ширине</label><input type="number" id="cols" value="8" min="1" max="60" step="1"></div>
+      <div class="chks" style="margin-top:6px">
+        <label class="chk"><input type="checkbox" id="gLabels" checked> Подписи A/1</label>
+        <label class="chk"><input type="checkbox" id="gSub"> Полуклетки</label>
+        <label class="chk"><input type="checkbox" id="gDiag"> Диагонали</label>
+        <label class="chk"><input type="checkbox" id="gCenter"> Центр. оси</label>
+      </div>
+      <div class="row" style="margin-top:10px"><label>Цвет / толщ.</label>
+        <input type="color" id="gColor" value="#ff2d55">
+        <input type="range" id="gWidth" min="0.1" max="1.2" step="0.05" value="0.3" class="grow">
+      </div>
+      <div class="row"><label>Заметность</label><input type="range" id="gAlpha" min="0.15" max="1" step="0.05" value="0.85"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>4 · Помощь глазу</legend>
+      <div class="chks">
+        <label class="chk"><input type="checkbox" id="fGray"> Ч/б (тон)</label>
+        <label class="chk"><input type="checkbox" id="fFlip"> Зеркало</label>
+      </div>
+      <div class="row" style="margin-top:6px"><label>Контраст</label><input type="range" id="fContrast" min="-60" max="80" step="1" value="0"></div>
+      <div class="row"><label>Постеризация</label>
+        <select id="fPoster" class="grow">
+          <option value="0">выкл</option>
+          <option value="2">2 тона (нотан)</option>
+          <option value="3">3 тона</option>
+          <option value="4">4 тона</option>
+          <option value="5">5 тонов</option>
+        </select>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>5 · Экспорт</legend>
+      <div class="row"><label>Плотность</label>
+        <select id="dpi" class="grow">
+          <option value="150">150 dpi — лёгкий файл</option>
+          <option value="254">254 dpi — 1 см = 100 px</option>
+          <option value="300" selected>300 dpi — стандарт печати</option>
+          <option value="400">400 dpi — крупно</option>
+        </select>
+      </div>
+      <div class="row"><label>Файл</label>
+        <select id="fileFmt" class="grow">
+          <option value="jpeg" selected>JPEG — лёгкий, для iPad</option>
+          <option value="png">PNG — без потерь</option>
+        </select>
+      </div>
+      <div class="btns" style="margin-top:9px">
+        <button class="btn primary" id="dlPng">⬇ Эталон для iPad</button>
+        <button class="btn" id="prRef">🖨 Печать эталона 1:1</button>
+      </div>
+      <div style="height:9px"></div>
+      <label class="chk" style="margin-bottom:4px"><input type="checkbox" id="ticksOnly"> Лист для бумаги: только метки по краям</label>
+      <div class="btns two">
+        <button class="btn" id="prPaper">🖨 Лист-сетка</button>
+        <button class="btn" id="dlSvg">⬇ SVG-лист</button>
+      </div>
+      <div class="btns" style="margin-top:7px">
+        <button class="btn" id="dlSvgRef">⬇ SVG-эталон (вектор)</button>
+      </div>
+    </fieldset>
+
+    <details class="help">
+      <summary>Как этим пользоваться</summary>
+      <ol>
+        <li>Загрузи картинку, выбери <b>A4/A3</b> и размер клетки (по умолчанию <b>20 мм</b>).</li>
+        <li>Подгони кадр: тяни картинку мышью/пальцем, зумируй колесом или щипком.</li>
+        <li><b>PNG-эталон</b> → отправь на iPad (iCloud Drive, OneDrive, Telegram, почта) и открой во весь экран.</li>
+        <li>Расчерти бумагу по цифрам из строки состояния: отступ от края = поля, дальше шаг = размер клетки. Либо напечатай <b>лист-сетку</b> и рисуй прямо на нём.</li>
+        <li>Рисуй по одной клетке: смотришь на <code>B7</code> на экране — рисуешь в <code>B7</code> на бумаге. Сначала обозначь, где линия входит и выходит из клетки, потом соединяй.</li>
+        <li>На листе есть <b>контрольная линейка 10 см</b> — измерь её после печати. Совпало → масштаб верный (печатать «Реальный размер / 100%», не «по размеру страницы»).</li>
+      </ol>
+    </details>
+
+    <button class="btn" id="resetAll" style="margin-top:12px">↺ Сбросить настройки</button>
+  </aside>
+
+  <!-- ======================= STAGE ======================= -->
+  <main class="stage">
+    <div class="canvasWrap">
+      <canvas id="view"></canvas>
+      <div class="hint">перетаскивай — двигает кадр · колесо / щипок — масштаб · двойной клик — сброс</div>
+    </div>
+    <div class="readout" id="readout"></div>
+  </main>
+</div>
+
+<div id="printRoot"></div>
+<style id="pageStyle"></style>
+
+<script>
+"use strict";
+
+/* ============================================================
+   Состояние
+   ============================================================ */
+const PAPERS = { A2:[420,594], A3:[297,420], A4:[210,297], A5:[148,210] };
+
+const st = {
+  paper:'A4', cw:210, ch:297, orient:'portrait', margin:12,
+  mode:'cell', cell:20, cols:8,
+  labels:true, sub:false, diag:false, center:false,
+  color:'#ff2d55', width:0.3, alpha:0.85,
+  gray:false, flip:false, contrast:0, poster:0,
+  fit:'cover', zoom:1, panX:0, panY:0, rot:0,
+  dpi:300, fmt:'jpeg', ticksOnly:false
+};
+const DEFAULTS = Object.freeze({...st});   // снимок до восстановления из localStorage
+
+let srcImg = null;       // исходное изображение
+let srcKey = 0;          // счётчик загрузок, для сброса кэша
+const FOOTER  = 14.5;    // высота нижней информационной полосы, мм
+const LABBAND = 7;       // полоса под буквенно-цифровые подписи, мм
+
+const $ = s => document.querySelector(s);
+
+/* ============================================================
+   Геометрия листа (всё в миллиметрах)
+   ============================================================ */
+function geo(){
+  let W, H;
+  if (st.paper === 'custom') { W = st.cw; H = st.ch; }
+  else { [W,H] = PAPERS[st.paper]; }
+  if (st.orient === 'landscape') { const t=W; W=H; H=t; }
+
+  const m = Math.min(st.margin, Math.min(W,H)/2 - 5);
+  const lab = st.labels ? LABBAND : 0;      // полоса под подписи A/1 — чтобы ничего не налезало
+  const ux = m + lab, uy = m + lab;
+  const uw = Math.max(10, W - 2*(m+lab));
+  const uh = Math.max(10, H - 2*(m+lab) - FOOTER);
+
+  let cell, cols, rows;
+  if (st.mode === 'cell') {
+    cell = Math.max(3, st.cell);
+    cols = Math.max(1, Math.floor((uw + 1e-6) / cell));
+    rows = Math.max(1, Math.floor((uh + 1e-6) / cell));
+  } else {
+    cols = Math.max(1, Math.round(st.cols));
+    cell = uw / cols;
+    rows = Math.max(1, Math.floor((uh + 1e-6) / cell));
+  }
+  const fw = cols*cell, fh = rows*cell;
+  const fx = ux + (uw - fw)/2;
+  const fy = uy + (uh - fh)/2;
+  return {W,H,m,lab,cell,cols,rows,fw,fh,fx,fy, footerTop: H - m - FOOTER};
+}
+
+/* ============================================================
+   Обработка изображения (поворот / ч-б / контраст / постеризация)
+   ============================================================ */
+const fxCache = { key:null, out:null, url:null };
+const MAXPX = 4400;
+
+function fxSource(){
+  if (!srcImg) return null;
+  const key = [srcKey, st.rot, st.gray, st.contrast, st.poster].join('|');
+  if (fxCache.key === key) return fxCache.out;
+
+  const plain = (st.rot === 0 && !st.gray && st.contrast === 0 && st.poster === 0);
+  if (plain){ fxCache.key = key; fxCache.out = srcImg; fxCache.url = null; return srcImg; }
+
+  const sw = srcImg.naturalWidth || srcImg.width;
+  const sh = srcImg.naturalHeight || srcImg.height;
+  const swap = (st.rot === 90 || st.rot === 270);
+  let w = swap ? sh : sw, h = swap ? sw : sh;
+  const k = Math.min(1, MAXPX / Math.max(w,h));
+  w = Math.max(1, Math.round(w*k)); h = Math.max(1, Math.round(h*k));
+
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const x = c.getContext('2d', {willReadFrequently:true});
+  x.save();
+  x.translate(w/2, h/2);
+  x.rotate(st.rot * Math.PI/180);
+  const dw = (swap ? h : w), dh = (swap ? w : h);
+  x.drawImage(srcImg, -dw/2, -dh/2, dw, dh);
+  x.restore();
+
+  if (st.gray || st.contrast !== 0 || st.poster !== 0){
+    const d = x.getImageData(0,0,w,h);
+    const p = d.data;
+    const cf = (259*(st.contrast+255))/(255*(259-st.contrast));
+    const lv = st.poster > 0 ? st.poster : 0;
+    for (let i=0;i<p.length;i+=4){
+      let r=p[i], g=p[i+1], b=p[i+2];
+      if (st.gray){ const y = 0.299*r + 0.587*g + 0.114*b; r=g=b=y; }
+      if (st.contrast !== 0){
+        r = cf*(r-128)+128; g = cf*(g-128)+128; b = cf*(b-128)+128;
+      }
+      if (lv > 1){
+        const q = v => Math.round(Math.round(Math.max(0,Math.min(255,v))/255*(lv-1))/(lv-1)*255);
+        r=q(r); g=q(g); b=q(b);
+      }
+      p[i]   = r<0?0:r>255?255:r;
+      p[i+1] = g<0?0:g>255?255:g;
+      p[i+2] = b<0?0:b>255?255:b;
+    }
+    x.putImageData(d,0,0);
+  }
+
+  fxCache.key = key; fxCache.out = c; fxCache.url = null;
+  return c;
+}
+
+/* data-URL источника — нужен только для SVG-экспорта */
+function fxDataURL(){
+  const s = fxSource(); if (!s) return null;
+  if (fxCache.url) return fxCache.url;
+  let c = s;
+  if (!(s instanceof HTMLCanvasElement)){
+    c = document.createElement('canvas');
+    c.width = s.naturalWidth; c.height = s.naturalHeight;
+    c.getContext('2d').drawImage(s,0,0);
+  }
+  fxCache.url = c.toDataURL('image/jpeg', 0.92);
+  return fxCache.url;
+}
+
+/* Положение картинки внутри рамки, в мм */
+function placement(g){
+  const im = fxSource(); if (!im) return null;
+  const iw = im.width || im.naturalWidth, ih = im.height || im.naturalHeight;
+  const base = st.fit === 'cover'
+    ? Math.max(g.fw/iw, g.fh/ih)
+    : Math.min(g.fw/iw, g.fh/ih);
+  const s = base * st.zoom;
+  const w = iw*s, h = ih*s;
+  const cx = g.fx + g.fw/2 + st.panX;
+  const cy = g.fy + g.fh/2 + st.panY;
+  return {img:im, x:cx-w/2, y:cy-h/2, w, h};
+}
+
+/* ============================================================
+   Рендереры: одна логика рисования → canvas и SVG
+   ============================================================ */
+const nm = v => +(+v).toFixed(3);
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+/* сдвиг базовой линии текста, общий для обоих рендереров */
+function ty(y, size, base){
+  if (base === 'top')    return y + size*0.80;
+  if (base === 'middle') return y + size*0.35;
+  return y; // alphabetic / bottom
+}
+
+function canvasRenderer(ctx, k){
+  ctx.setTransform(k,0,0,k,0,0);
+  ctx.lineCap = 'butt';
+  const FONT = '"Inter","Segoe UI",Arial,sans-serif';
+  return {
+    rect(x,y,w,h,o={}){
+      ctx.save();
+      if (o.fill){ ctx.globalAlpha = o.alpha ?? 1; ctx.fillStyle = o.fill; ctx.fillRect(x,y,w,h); }
+      if (o.stroke){ ctx.globalAlpha = o.alpha ?? 1; ctx.strokeStyle = o.stroke; ctx.lineWidth = o.width ?? .3; ctx.strokeRect(x,y,w,h); }
+      ctx.restore();
+    },
+    line(x1,y1,x2,y2,o={}){
+      ctx.save();
+      ctx.globalAlpha = o.alpha ?? 1;
+      ctx.strokeStyle = o.stroke || '#000';
+      ctx.lineWidth = o.width ?? .3;
+      ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+      ctx.restore();
+    },
+    text(x,y,s,o={}){
+      ctx.save();
+      const size = o.size ?? 3;
+      ctx.globalAlpha = o.alpha ?? 1;
+      ctx.fillStyle = o.fill || '#000';
+      ctx.font = (o.weight===600?'600 ':'') + size + 'px ' + FONT;
+      ctx.textAlign = o.align === 'center' ? 'center' : o.align === 'right' ? 'right' : 'left';
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillText(String(s), x, ty(y,size,o.base));
+      ctx.restore();
+    },
+    image(im,x,y,w,h,o={}){
+      ctx.save();
+      if (o.clip){ ctx.beginPath(); ctx.rect(o.clip[0],o.clip[1],o.clip[2],o.clip[3]); ctx.clip(); }
+      if (o.flip){ const cx=x+w/2; ctx.translate(cx,0); ctx.scale(-1,1); ctx.translate(-cx,0); }
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(im,x,y,w,h);
+      ctx.restore();
+    },
+    done(){ ctx.setTransform(1,0,0,1,0,0); }
+  };
+}
+
+function svgRenderer(W,H){
+  const body = []; const defs = []; let cid = 0;
+  const FONT = "Inter, 'Segoe UI', Arial, sans-serif";
+  const al = a => (a===undefined||a===1) ? '' : ` opacity="${nm(a)}"`;
+  return {
+    rect(x,y,w,h,o={}){
+      if (o.fill) body.push(`<rect x="${nm(x)}" y="${nm(y)}" width="${nm(w)}" height="${nm(h)}" fill="${o.fill}"${al(o.alpha)}/>`);
+      if (o.stroke) body.push(`<rect x="${nm(x)}" y="${nm(y)}" width="${nm(w)}" height="${nm(h)}" fill="none" stroke="${o.stroke}" stroke-width="${nm(o.width??.3)}"${al(o.alpha)}/>`);
+    },
+    line(x1,y1,x2,y2,o={}){
+      body.push(`<line x1="${nm(x1)}" y1="${nm(y1)}" x2="${nm(x2)}" y2="${nm(y2)}" stroke="${o.stroke||'#000'}" stroke-width="${nm(o.width??.3)}"${al(o.alpha)}/>`);
+    },
+    text(x,y,s,o={}){
+      const size = o.size ?? 3;
+      const anc = o.align === 'center' ? 'middle' : o.align === 'right' ? 'end' : 'start';
+      body.push(`<text x="${nm(x)}" y="${nm(ty(y,size,o.base))}" font-family="${FONT}" font-size="${nm(size)}" font-weight="${o.weight||400}" fill="${o.fill||'#000'}" text-anchor="${anc}"${al(o.alpha)}>${esc(s)}</text>`);
+    },
+    image(im,x,y,w,h,o={}){
+      const href = fxDataURL(); if (!href) return;
+      let attrs = '';
+      if (o.clip){
+        const id = 'clp'+(++cid);
+        defs.push(`<clipPath id="${id}"><rect x="${nm(o.clip[0])}" y="${nm(o.clip[1])}" width="${nm(o.clip[2])}" height="${nm(o.clip[3])}"/></clipPath>`);
+        attrs = ` clip-path="url(#${id})"`;
+      }
+      const tr = o.flip ? ` transform="translate(${nm(2*(x+w/2))},0) scale(-1,1)"` : '';
+      body.push(`<g${attrs}><image href="${href}" x="${nm(x)}" y="${nm(y)}" width="${nm(w)}" height="${nm(h)}" preserveAspectRatio="none"${tr}/></g>`);
+    },
+    done(){
+      return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" `
+        + `width="${nm(W)}mm" height="${nm(H)}mm" viewBox="0 0 ${nm(W)} ${nm(H)}">`
+        + (defs.length ? `<defs>${defs.join('')}</defs>` : '')
+        + body.join('') + `</svg>`;
+    }
+  };
+}
+
+/* ============================================================
+   Единая процедура отрисовки листа (координаты — миллиметры)
+   ============================================================ */
+function colLabel(i){
+  let s = '';
+  do { s = String.fromCharCode(65 + (i % 26)) + s; i = Math.floor(i/26) - 1; } while (i >= 0);
+  return s;
+}
+function fmt(v, d=1){
+  const s = (+v).toFixed(d);
+  return s.replace(/\.0+$/,'').replace(/(\.\d*?)0+$/,'$1');
+}
+
+function drawSheet(r, g, opt){
+  const withImage = !!opt.withImage;
+  const paperMode = !!opt.paperMode;      // пустой лист для бумаги
+  const ticks     = paperMode && st.ticksOnly;
+
+  const gc   = paperMode ? '#7d8590' : st.color;
+  const ga   = paperMode ? 0.75 : st.alpha;
+  const gw   = paperMode ? Math.max(0.18, st.width*0.7) : st.width;
+  const inkD = '#111318', inkM = '#5a6070';
+
+  // бумага
+  r.rect(0,0,g.W,g.H,{fill:'#ffffff'});
+
+  // картинка
+  if (withImage){
+    const p = placement(g);
+    if (p) r.image(p.img, p.x, p.y, p.w, p.h, {clip:[g.fx,g.fy,g.fw,g.fh], flip:st.flip});
+    else {
+      r.rect(g.fx,g.fy,g.fw,g.fh,{fill:'#f2f3f5'});
+      r.text(g.fx+g.fw/2, g.fy+g.fh/2, 'загрузи изображение', {size:5, fill:'#b9bec9', align:'center', base:'middle'});
+    }
+  }
+
+  // полуклетки
+  if (st.sub && !ticks){
+    const h = g.cell/2;
+    for (let i=1; i<g.cols*2; i+=2){ const x=g.fx+i*h; r.line(x,g.fy,x,g.fy+g.fh,{stroke:gc,width:gw*0.6,alpha:ga*0.4}); }
+    for (let j=1; j<g.rows*2; j+=2){ const y=g.fy+j*h; r.line(g.fx,y,g.fx+g.fw,y,{stroke:gc,width:gw*0.6,alpha:ga*0.4}); }
+  }
+
+  // основная сетка
+  if (ticks){
+    const t = Math.min(4, g.cell*0.35);
+    for (let i=0; i<=g.cols; i++){
+      const x = g.fx + i*g.cell;
+      r.line(x,g.fy,x,g.fy+t,{stroke:gc,width:gw,alpha:ga});
+      r.line(x,g.fy+g.fh-t,x,g.fy+g.fh,{stroke:gc,width:gw,alpha:ga});
+    }
+    for (let j=0; j<=g.rows; j++){
+      const y = g.fy + j*g.cell;
+      r.line(g.fx,y,g.fx+t,y,{stroke:gc,width:gw,alpha:ga});
+      r.line(g.fx+g.fw-t,y,g.fx+g.fw,y,{stroke:gc,width:gw,alpha:ga});
+    }
+  } else {
+    for (let i=1; i<g.cols; i++){ const x=g.fx+i*g.cell; r.line(x,g.fy,x,g.fy+g.fh,{stroke:gc,width:gw,alpha:ga}); }
+    for (let j=1; j<g.rows; j++){ const y=g.fy+j*g.cell; r.line(g.fx,y,g.fx+g.fw,y,{stroke:gc,width:gw,alpha:ga}); }
+  }
+
+  // диагонали и центральные оси
+  if (st.diag){
+    r.line(g.fx,g.fy,g.fx+g.fw,g.fy+g.fh,{stroke:gc,width:gw*0.9,alpha:ga*0.55});
+    r.line(g.fx+g.fw,g.fy,g.fx,g.fy+g.fh,{stroke:gc,width:gw*0.9,alpha:ga*0.55});
+  }
+  if (st.center){
+    r.line(g.fx+g.fw/2,g.fy,g.fx+g.fw/2,g.fy+g.fh,{stroke:gc,width:gw*1.6,alpha:ga*0.8});
+    r.line(g.fx,g.fy+g.fh/2,g.fx+g.fw,g.fy+g.fh/2,{stroke:gc,width:gw*1.6,alpha:ga*0.8});
+  }
+
+  // рамка
+  r.rect(g.fx,g.fy,g.fw,g.fh,{stroke:paperMode?'#3d434f':gc, width:gw*2, alpha:paperMode?0.9:Math.min(1,ga+0.15)});
+
+  // подписи A/B/C и 1/2/3 — в полях, вне кадра
+  if (st.labels){
+    // кегль подписей ужимаем так, чтобы самый длинный номер строки влез в полосу
+    const digits = String(g.rows).length;
+    const fs = Math.max(2, Math.min(4.2, g.cell*0.3, (LABBAND - 1.8)/(0.62*digits)));
+    const col = paperMode ? inkM : inkD;
+    // дубли снизу/справа рисуем только если под них реально есть место
+    const dupB = (g.fy + g.fh + 1.3 + fs) <= (g.footerTop - 1);
+    const dupR = (g.fx + g.fw + 1.3 + fs*1.6) <= (g.W - g.m);
+    for (let i=0; i<g.cols; i++){
+      const x = g.fx + (i+0.5)*g.cell;
+      r.text(x, g.fy - 1.3, colLabel(i), {size:fs, fill:col, align:'center', base:'bottom', weight:600});
+      if (dupB) r.text(x, g.fy + g.fh + 1.3, colLabel(i), {size:fs, fill:col, align:'center', base:'top', alpha:0.6});
+    }
+    for (let j=0; j<g.rows; j++){
+      const y = g.fy + (j+0.5)*g.cell - fs/2;
+      r.text(g.fx - 1.3, y, j+1, {size:fs, fill:col, align:'right', base:'middle', weight:600});
+      if (dupR) r.text(g.fx + g.fw + 1.3, y, j+1, {size:fs, fill:col, align:'left', base:'middle', alpha:0.6});
+    }
+  }
+
+  // ---------- нижняя полоса: линейка + цифры ----------
+  const barLen = Math.min(100, Math.max(30, Math.floor(g.fw*0.45/10)*10));
+  const bx = g.m, by = g.footerTop + 5.5;
+
+  const fsF = Math.max(2, Math.min(3, g.W/100));   // подпись масштабируется под формат
+
+  // контрольная линейка
+  r.line(bx, by, bx+barLen, by, {stroke:inkD, width:0.35});
+  for (let i=0; i<=barLen/10; i++){
+    const x = bx + i*10;
+    const big = (i % 5 === 0);
+    r.line(x, by, x, by - (big?3:1.8), {stroke:inkD, width:big?0.4:0.25});
+  }
+  for (let i=0; i<barLen/10; i+=2) r.rect(bx+i*10, by, 10, 1.4, {fill:inkD});
+  r.text(bx+barLen+2.5, by, `${barLen/10} см`, {size:fsF, fill:inkD, weight:600});
+
+  const cellCm = g.cell/10;
+  const l1 = `${st.paper==='custom'?fmt(g.W)+'×'+fmt(g.H)+' мм':st.paper} · ${st.orient==='portrait'?'портрет':'альбом'}`
+           + ` · клетка ${fmt(g.cell)} мм (${fmt(cellCm,2)} см) · ${g.cols}×${g.rows} = ${g.cols*g.rows} кл.`;
+  const l2 = `печать 100 % · кадр ${fmt(g.fw)}×${fmt(g.fh)} мм · 1-я линия: ${fmt(g.fx)} мм от левого края, ${fmt(g.fy)} мм от верхнего`;
+  r.text(g.W-g.m, by, l1, {size:fsF+0.4, fill:inkD, align:'right', weight:600});
+  r.text(g.W-g.m, by+4.6, l2, {size:fsF, fill:inkM, align:'right', base:'top'});
+}
+
+/* ============================================================
+   Превью
+   ============================================================ */
+const view = $('#view');
+const vctx = view.getContext('2d');
+let previewScale = 1; // px экрана на мм (CSS-пиксели)
+
+function renderPreview(){
+  const g = geo();
+  const wrap = view.parentElement;
+  const availW = Math.max(120, wrap.clientWidth  - 32);
+  const availH = Math.max(120, wrap.clientHeight - 42);
+  const k = Math.min(availW/g.W, availH/g.H);
+  previewScale = k;
+
+  const dpr = Math.min(2.5, window.devicePixelRatio || 1);
+  view.style.width  = (g.W*k) + 'px';
+  view.style.height = (g.H*k) + 'px';
+  view.width  = Math.round(g.W*k*dpr);
+  view.height = Math.round(g.H*k*dpr);
+
+  vctx.setTransform(1,0,0,1,0,0);
+  vctx.clearRect(0,0,view.width,view.height);
+  drawSheet(canvasRenderer(vctx, k*dpr), g, {withImage:true});
+  vctx.setTransform(1,0,0,1,0,0);
+
+  updateReadout(g);
+}
+
+function updateReadout(g){
+  const pxmm = st.dpi/25.4;
+  const cellPx = g.cell*pxmm;
+  const outW = Math.round(g.W*pxmm), outH = Math.round(g.H*pxmm);
+  const mpx = (outW*outH/1e6);
+  const heavy = mpx > 45;
+
+  const stats = [
+    ['hero','1 клетка', `${fmt(g.cell)} мм = ${fmt(g.cell/10,2)} см = ${Math.round(cellPx)} px`],
+    ['','сетка', `${g.cols} × ${g.rows} клеток`],
+    ['','кадр на бумаге', `${fmt(g.fw)} × ${fmt(g.fh)} мм`],
+    ['','1 см', `${Math.round(10*pxmm)} px @ ${st.dpi} dpi`],
+    ['','лист', `${fmt(g.W)} × ${fmt(g.H)} мм`],
+    ['','файл на выходе', `${outW} × ${outH} px${heavy?' ⚠':''}`],
+  ];
+  $('#readout').innerHTML = stats.map(([c,i,b]) =>
+    `<div class="stat ${c}"><i>${i}</i><b class="${b.includes('⚠')?'warn':''}">${b}</b></div>`).join('')
+    + (heavy ? `<div class="stat"><i>совет</i><b class="warn">${mpx.toFixed(0)} Мпикс — снизь dpi</b></div>` : '');
+}
+
+/* ============================================================
+   Взаимодействие: панорама и зум
+   ============================================================ */
+const ptrs = new Map();
+let pinch = null;
+
+function toMM(e){
+  const r = view.getBoundingClientRect();
+  const g = geo();
+  return { x:(e.clientX - r.left)/r.width*g.W, y:(e.clientY - r.top)/r.height*g.H };
+}
+function zoomAt(px, py, f){
+  const g = geo();
+  const cx = g.fx + g.fw/2, cy = g.fy + g.fh/2;
+  const nz = Math.max(0.2, Math.min(6, st.zoom*f));
+  const real = nz/st.zoom;
+  st.panX = px - cx - (px - cx - st.panX)*real;
+  st.panY = py - cy - (py - cy - st.panY)*real;
+  st.zoom = nz;
+  $('#zoom').value = st.zoom;
+}
+
+view.addEventListener('pointerdown', e => {
+  view.setPointerCapture(e.pointerId);
+  ptrs.set(e.pointerId, toMM(e));
+  view.classList.add('drag');
+  if (ptrs.size === 2){
+    const [a,b] = [...ptrs.values()];
+    pinch = { d:Math.hypot(a.x-b.x, a.y-b.y), m:{x:(a.x+b.x)/2, y:(a.y+b.y)/2} };
+  }
+});
+view.addEventListener('pointermove', e => {
+  if (!ptrs.has(e.pointerId)) return;
+  const p = toMM(e);
+  if (ptrs.size === 1){
+    const prev = ptrs.get(e.pointerId);
+    st.panX += p.x - prev.x;
+    st.panY += p.y - prev.y;
+    ptrs.set(e.pointerId, p);
+    renderPreview();
+  } else if (ptrs.size === 2 && pinch){
+    ptrs.set(e.pointerId, p);
+    const [a,b] = [...ptrs.values()];
+    const d = Math.hypot(a.x-b.x, a.y-b.y);
+    const m = {x:(a.x+b.x)/2, y:(a.y+b.y)/2};
+    if (pinch.d > 0.5){
+      st.panX += m.x - pinch.m.x;
+      st.panY += m.y - pinch.m.y;
+      zoomAt(m.x, m.y, d/pinch.d);
+    }
+    pinch = { d, m };
+    renderPreview();
+  }
+});
+function endPtr(e){
+  ptrs.delete(e.pointerId);
+  if (ptrs.size < 2) pinch = null;
+  if (ptrs.size === 0) view.classList.remove('drag');
+}
+view.addEventListener('pointerup', endPtr);
+view.addEventListener('pointercancel', endPtr);
+view.addEventListener('dblclick', () => { resetFrame(); });
+view.addEventListener('wheel', e => {
+  e.preventDefault();
+  const p = toMM(e);
+  zoomAt(p.x, p.y, e.deltaY < 0 ? 1.08 : 1/1.08);
+  renderPreview();
+}, {passive:false});
+
+function resetFrame(){
+  st.zoom = 1; st.panX = 0; st.panY = 0;
+  $('#zoom').value = 1;
+  renderPreview();
+}
+
+/* стрелки — точный сдвиг кадра: 1 мм, с Shift — 0.1 мм */
+window.addEventListener('keydown', e => {
+  if (/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement?.tagName || '')) return;
+  const d = { ArrowLeft:[-1,0], ArrowRight:[1,0], ArrowUp:[0,-1], ArrowDown:[0,1] }[e.key];
+  if (!d) return;
+  e.preventDefault();
+  const s = e.shiftKey ? 0.1 : 1;
+  st.panX += d[0]*s; st.panY += d[1]*s;
+  renderPreview();
+});
+
+/* ============================================================
+   Загрузка изображения
+   ============================================================ */
+function loadFile(f){
+  if (!f) return;
+  const err = $('#err');
+  err.style.display = 'none';
+  const url = URL.createObjectURL(f);
+  const im = new Image();
+  im.onload = () => {
+    srcImg = im; srcKey++;
+    fxCache.key = null;
+    resetFrame();
+    save();
+  };
+  im.onerror = () => {
+    URL.revokeObjectURL(url);
+    err.textContent = 'Не удалось открыть файл. Формат HEIC читается только в Safari — на Windows пересохрани в JPG/PNG.';
+    err.style.display = 'block';
+  };
+  im.src = url;
+}
+
+$('#file').addEventListener('change', e => loadFile(e.target.files[0]));
+$('#drop').addEventListener('click', () => $('#file').click());
+['dragenter','dragover'].forEach(t => $('#drop').addEventListener(t, e => {
+  e.preventDefault(); $('#drop').classList.add('hot');
+}));
+['dragleave','drop'].forEach(t => $('#drop').addEventListener(t, e => {
+  e.preventDefault(); $('#drop').classList.remove('hot');
+}));
+$('#drop').addEventListener('drop', e => loadFile(e.dataTransfer.files[0]));
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => { e.preventDefault(); if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); });
+window.addEventListener('paste', e => {
+  for (const it of (e.clipboardData?.items || [])){
+    if (it.type.startsWith('image/')) { loadFile(it.getAsFile()); break; }
+  }
+});
+
+/* ============================================================
+   Экспорт
+   ============================================================ */
+function renderToCanvas(dpi, opt){
+  const g = geo();
+  const k = dpi/25.4;
+  const c = document.createElement('canvas');
+  c.width  = Math.round(g.W*k);
+  c.height = Math.round(g.H*k);
+  // браузер молча отдаёт пустой холст, если превысить лимит — лучше сказать прямо
+  if (c.width*c.height > 120e6 || Math.max(c.width,c.height) > 16000){
+    alert(`Слишком крупный экспорт: ${c.width}×${c.height} px.\nВыбери плотность пониже (150 или 254 dpi).`);
+    return null;
+  }
+  const x = c.getContext('2d');
+  x.fillStyle = '#fff'; x.fillRect(0,0,c.width,c.height);
+  drawSheet(canvasRenderer(x, k), g, opt);
+  x.setTransform(1,0,0,1,0,0);
+  return {canvas:c, g};
+}
+
+function baseName(){
+  const g = geo();
+  return `grid_${st.paper}_${st.orient==='portrait'?'P':'L'}_${fmt(g.cell)}mm_${g.cols}x${g.rows}`;
+}
+function download(blobOrUrl, name){
+  const a = document.createElement('a');
+  a.href = (blobOrUrl instanceof Blob) ? URL.createObjectURL(blobOrUrl) : blobOrUrl;
+  a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  if (blobOrUrl instanceof Blob) setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+$('#dlPng').addEventListener('click', () => {
+  const r = renderToCanvas(st.dpi, {withImage:true}); if (!r) return;
+  const canvas = r.canvas;
+  const jpg = st.fmt === 'jpeg';
+  canvas.toBlob(b => download(b, baseName()+'_ref.'+(jpg?'jpg':'png')),
+                jpg ? 'image/jpeg' : 'image/png', jpg ? 0.9 : undefined);
+});
+
+$('#dlSvg').addEventListener('click', () => {
+  const g = geo();
+  const r = svgRenderer(g.W, g.H);
+  drawSheet(r, g, {withImage:false, paperMode:true});
+  download(new Blob([r.done()], {type:'image/svg+xml'}), baseName()+'_paper.svg');
+});
+
+$('#dlSvgRef').addEventListener('click', () => {
+  const g = geo();
+  const r = svgRenderer(g.W, g.H);
+  drawSheet(r, g, {withImage:true});
+  download(new Blob([r.done()], {type:'image/svg+xml'}), baseName()+'_ref.svg');
+});
+
+function printSheet(opt){
+  const res = renderToCanvas(Math.min(st.dpi, 300), opt); if (!res) return;
+  const {canvas, g} = res;
+  $('#pageStyle').textContent = `@page{ size:${nm(g.W)}mm ${nm(g.H)}mm; margin:0 }`;
+  const root = $('#printRoot');
+  root.innerHTML = `<img src="${canvas.toDataURL('image/png')}" style="width:${nm(g.W)}mm;height:${nm(g.H)}mm">`;
+  const img = root.querySelector('img');
+  const go = () => setTimeout(() => { window.print(); }, 60);
+  if (img.complete) go(); else img.onload = go;
+}
+$('#prRef').addEventListener('click',   () => printSheet({withImage:true}));
+$('#prPaper').addEventListener('click', () => printSheet({withImage:false, paperMode:true}));
+window.addEventListener('afterprint', () => { $('#printRoot').innerHTML = ''; });
+
+/* ============================================================
+   Привязка контролов
+   ============================================================ */
+function seg(id, key, after){
+  const el = $(id);
+  el.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    [...el.children].forEach(c => c.classList.toggle('on', c === b));
+    st[key] = b.dataset.v;
+    if (after) after();
+    renderPreview(); save();
+  });
+}
+function num(id, key, after){
+  const el = $(id);
+  el.addEventListener('input', () => {
+    const v = parseFloat(el.value);
+    if (!isNaN(v)) { st[key] = v; if (after) after(); renderPreview(); save(); }
+  });
+}
+function chk(id, key, after){
+  const el = $(id);
+  el.addEventListener('change', () => { st[key] = el.checked; if (after) after(); renderPreview(); save(); });
+}
+
+seg('#segFit','fit');
+seg('#segOrient','orient');
+seg('#segMode','mode', () => {
+  $('#rowCell').style.display = st.mode === 'cell' ? '' : 'none';
+  $('#rowCols').style.display = st.mode === 'cols' ? '' : 'none';
+});
+
+$('#paper').addEventListener('change', () => {
+  st.paper = $('#paper').value;
+  $('#rowCustom').style.display = st.paper === 'custom' ? '' : 'none';
+  renderPreview(); save();
+});
+num('#cw','cw'); num('#ch','ch');
+num('#margin','margin'); num('#cell','cell'); num('#cols','cols');
+num('#gWidth','width'); num('#gAlpha','alpha');
+num('#fContrast','contrast', () => fxCache.key = null);
+
+$('#gColor').addEventListener('input', () => { st.color = $('#gColor').value; renderPreview(); save(); });
+$('#fPoster').addEventListener('change', () => { st.poster = +$('#fPoster').value; fxCache.key = null; renderPreview(); save(); });
+$('#dpi').addEventListener('change', () => { st.dpi = +$('#dpi').value; renderPreview(); save(); });
+$('#fileFmt').addEventListener('change', () => { st.fmt = $('#fileFmt').value; renderPreview(); save(); });
+
+chk('#gLabels','labels'); chk('#gSub','sub'); chk('#gDiag','diag'); chk('#gCenter','center');
+chk('#fGray','gray', () => fxCache.key = null);
+chk('#fFlip','flip');
+chk('#ticksOnly','ticksOnly');
+
+$('#zoom').addEventListener('input', () => { st.zoom = +$('#zoom').value; renderPreview(); });
+$('#reset').addEventListener('click', resetFrame);
+$('#rot').addEventListener('click', () => {
+  st.rot = (st.rot + 90) % 360;
+  fxCache.key = null;
+  resetFrame(); save();
+});
+
+/* ============================================================
+   Сохранение настроек
+   ============================================================ */
+const KEY = 'sketchgrid.v1';
+function save(){
+  try{
+    const {zoom,panX,panY,rot, ...rest} = st;
+    localStorage.setItem(KEY, JSON.stringify(rest));
+  }catch(e){}
+}
+function restore(){
+  let s = null;
+  try { s = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch(e){}
+  if (s) Object.assign(st, s);
+
+  $('#paper').value = st.paper;
+  $('#rowCustom').style.display = st.paper === 'custom' ? '' : 'none';
+  $('#cw').value = st.cw; $('#ch').value = st.ch;
+  $('#margin').value = st.margin;
+  $('#cell').value = st.cell; $('#cols').value = st.cols;
+  $('#rowCell').style.display = st.mode === 'cell' ? '' : 'none';
+  $('#rowCols').style.display = st.mode === 'cols' ? '' : 'none';
+  $('#gColor').value = st.color; $('#gWidth').value = st.width; $('#gAlpha').value = st.alpha;
+  $('#gLabels').checked = st.labels; $('#gSub').checked = st.sub;
+  $('#gDiag').checked = st.diag; $('#gCenter').checked = st.center;
+  $('#fGray').checked = st.gray; $('#fFlip').checked = st.flip;
+  $('#fContrast').value = st.contrast; $('#fPoster').value = st.poster;
+  $('#dpi').value = st.dpi; $('#fileFmt').value = st.fmt; $('#ticksOnly').checked = st.ticksOnly;
+
+  const mark = (id,key) => [...$(id).children].forEach(b => b.classList.toggle('on', b.dataset.v === st[key]));
+  mark('#segFit','fit'); mark('#segOrient','orient'); mark('#segMode','mode');
+}
+
+$('#resetAll').addEventListener('click', () => {
+  if (!confirm('Вернуть все настройки к значениям по умолчанию?')) return;
+  try { localStorage.removeItem(KEY); } catch(e){}
+  Object.assign(st, DEFAULTS);
+  restore(); resetFrame(); save();
+});
+
+restore();
+renderPreview();
+window.addEventListener('resize', renderPreview);
+new ResizeObserver(() => renderPreview()).observe(view.parentElement);
+</script>
+</body>
+</html>
