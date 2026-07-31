@@ -6,9 +6,9 @@
 <title>Sketch Grid — сетка для переноса на бумагу</title>
 <style>
   :root{
-    --bg:#14151a; --bg2:#1b1d24; --bg3:#23262f; --line:#31343f;
-    --fg:#e8e9ee; --fg2:#9aa0b0; --fg3:#6b7183;
-    --acc:#ff6a3d; --acc2:#ffb02e; --ok:#4ade80;
+    --bg:#121212; --bg2:#181818; --bg3:#242424; --line:#343434;
+    --fg:#ededed; --fg2:#a3a3a3; --fg3:#707070;
+    --acc:#ffffff; --acc2:#c9c9c9; --ink:#111111;
     --r:10px;
   }
   *{box-sizing:border-box}
@@ -46,7 +46,7 @@
 
   .seg{display:flex; background:var(--bg3); border:1px solid var(--line); border-radius:7px; overflow:hidden; flex:1}
   .seg button{flex:1; min-width:0; background:none; border:0; color:var(--fg2); padding:6px 3px; font:inherit; font-size:11.5px; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
-  .seg button.on{background:var(--acc); color:#15161a; font-weight:600}
+  .seg button.on{background:var(--acc); color:var(--ink); font-weight:600}
   .seg button+button{border-left:1px solid var(--line)}
 
   .chk{display:flex; align-items:center; gap:7px; font-size:12.5px; color:var(--fg2); cursor:pointer; padding:3px 0}
@@ -58,7 +58,7 @@
     padding:9px 10px; font:inherit; font-size:13px; cursor:pointer; width:100%; transition:.12s;
   }
   button.btn:hover{border-color:var(--acc); color:#fff}
-  button.btn.primary{background:var(--acc); border-color:var(--acc); color:#15161a; font-weight:600}
+  button.btn.primary{background:var(--acc); border-color:var(--acc); color:var(--ink); font-weight:600}
   button.btn.primary:hover{filter:brightness(1.1)}
   button.btn:disabled{opacity:.4; cursor:not-allowed}
   .btns{display:grid; gap:7px}
@@ -68,12 +68,12 @@
     border:1.5px dashed var(--line); border-radius:var(--r); padding:16px 10px; text-align:center;
     color:var(--fg3); font-size:12.5px; cursor:pointer; transition:.15s; background:var(--bg)
   }
-  .drop:hover,.drop.hot{border-color:var(--acc); color:var(--fg2); background:#1e2027}
+  .drop:hover,.drop.hot{border-color:var(--acc); color:var(--fg2); background:#1f1f1f}
   .drop b{display:block; color:var(--fg); font-size:13.5px; margin-bottom:3px}
 
   /* ---------- stage ---------- */
   .stage{display:flex; flex-direction:column; min-width:0; min-height:0; background:
-     radial-gradient(1100px 600px at 50% 0%, #1c1e26 0%, #101116 70%)}
+     radial-gradient(1100px 600px at 50% 0%, #1e1e1e 0%, #0e0e0e 70%)}
   .canvasWrap{flex:1; display:flex; align-items:center; justify-content:center; padding:16px; min-height:0; position:relative}
   #view{
     max-width:100%; max-height:100%; box-shadow:0 14px 50px rgba(0,0,0,.6), 0 0 0 1px #000;
@@ -90,9 +90,9 @@
   .stat{background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:6px 10px; min-width:0}
   .stat i{display:block; font-style:normal; font-size:10px; letter-spacing:.07em; text-transform:uppercase; color:var(--fg3)}
   .stat b{display:block; font-size:14px; font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap}
-  .stat.hero{border-color:var(--acc); background:#241a15}
-  .stat.hero b{color:var(--acc2)}
-  .warn{color:#ff8a5c}
+  .stat.hero{border-color:var(--acc); background:#202020}
+  .stat.hero b{color:var(--acc)}
+  .warn{color:#fff; font-weight:700}
 
   /* Узкие экраны: превью «прилипает» сверху, чтобы лист оставался виден,
      пока крутишь настройки. Блок стоит после базовых правил намеренно —
@@ -114,7 +114,7 @@
   details.help li{margin:5px 0}
   details.help code{background:var(--bg3); padding:1px 5px; border-radius:4px; color:var(--fg); font-size:12px}
 
-  .err{color:#ff7a7a; font-size:12px; margin-top:8px; display:none}
+  .err{color:#fff; font-size:12px; margin-top:8px; display:none; border-left:2px solid #fff; padding-left:8px}
 
   /* ---------- print ---------- */
   #printRoot{display:none}
@@ -198,7 +198,7 @@
         <label class="chk"><input type="checkbox" id="gCenter"> Центр. оси</label>
       </div>
       <div class="row" style="margin-top:10px"><label>Цвет / толщ.</label>
-        <input type="color" id="gColor" value="#ff2d55">
+        <input type="color" id="gColor" value="#ffffff">
         <input type="range" id="gWidth" min="0.1" max="1.2" step="0.05" value="0.3" class="grow">
       </div>
       <div class="row"><label>Заметность</label><input type="range" id="gAlpha" min="0.15" max="1" step="0.05" value="0.85"></div>
@@ -293,7 +293,7 @@ const st = {
   paper:'A4', cw:210, ch:297, orient:'portrait', margin:12,
   mode:'cell', cell:20, cols:8,
   labels:true, sub:false, diag:false, center:false,
-  color:'#ff2d55', width:0.3, alpha:0.85,
+  color:'#ffffff', width:0.3, alpha:0.85,
   gray:false, flip:false, contrast:0, poster:0,
   fit:'cover', zoom:1, panX:0, panY:0, rot:0,
   dpi:300, fmt:'jpeg', ticksOnly:false
@@ -533,10 +533,10 @@ function drawSheet(r, g, opt){
   const paperMode = !!opt.paperMode;      // пустой лист для бумаги
   const ticks     = paperMode && st.ticksOnly;
 
-  const gc   = paperMode ? '#7d8590' : st.color;
+  const gc   = paperMode ? '#808080' : st.color;
   const ga   = paperMode ? 0.75 : st.alpha;
   const gw   = paperMode ? Math.max(0.18, st.width*0.7) : st.width;
-  const inkD = '#111318', inkM = '#5a6070';
+  const inkD = '#111111', inkM = '#5c5c5c';
 
   // бумага
   r.rect(0,0,g.W,g.H,{fill:'#ffffff'});
@@ -546,8 +546,8 @@ function drawSheet(r, g, opt){
     const p = placement(g);
     if (p) r.image(p.img, p.x, p.y, p.w, p.h, {clip:[g.fx,g.fy,g.fw,g.fh], flip:st.flip});
     else {
-      r.rect(g.fx,g.fy,g.fw,g.fh,{fill:'#f2f3f5'});
-      r.text(g.fx+g.fw/2, g.fy+g.fh/2, 'загрузи изображение', {size:5, fill:'#b9bec9', align:'center', base:'middle'});
+      r.rect(g.fx,g.fy,g.fw,g.fh,{fill:'#f2f2f2'});
+      r.text(g.fx+g.fw/2, g.fy+g.fh/2, 'загрузи изображение', {size:5, fill:'#bdbdbd', align:'center', base:'middle'});
     }
   }
 
@@ -587,7 +587,7 @@ function drawSheet(r, g, opt){
   }
 
   // рамка
-  r.rect(g.fx,g.fy,g.fw,g.fh,{stroke:paperMode?'#3d434f':gc, width:gw*2, alpha:paperMode?0.9:Math.min(1,ga+0.15)});
+  r.rect(g.fx,g.fy,g.fw,g.fh,{stroke:paperMode?'#404040':gc, width:gw*2, alpha:paperMode?0.9:Math.min(1,ga+0.15)});
 
   // подписи A/B/C и 1/2/3 — в полях, вне кадра
   if (st.labels){
@@ -941,7 +941,7 @@ $('#rot').addEventListener('click', () => {
 /* ============================================================
    Сохранение настроек
    ============================================================ */
-const KEY = 'sketchgrid.v1';
+const KEY = 'sketchgrid.v2';   // v1 хранил оранжевую тему и розовую сетку
 function save(){
   try{
     const {zoom,panX,panY,rot, ...rest} = st;
