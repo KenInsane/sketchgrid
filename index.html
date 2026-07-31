@@ -32,7 +32,7 @@
   legend{font-size:11px; text-transform:uppercase; letter-spacing:.09em; color:var(--acc2); padding:0 6px}
   .row{display:flex; gap:8px; align-items:center; margin:8px 0}
   .row:first-of-type{margin-top:2px}
-  .row > label{flex:0 0 96px; color:var(--fg2); font-size:12px}
+  .row > label{flex:0 0 88px; color:var(--fg2); font-size:12px}
   .row.wide > label{flex:0 0 auto}
   .grow{flex:1; min-width:0}
 
@@ -80,7 +80,8 @@
     border-radius:2px; touch-action:none; cursor:grab; background:#fff
   }
   #view.drag{cursor:grabbing}
-  .hint{position:absolute; left:50%; bottom:8px; transform:translateX(-50%); font-size:11px; color:var(--fg3); pointer-events:none; text-align:center}
+  /* Подсказка живёт в потоке под холстом: абсолютной она ложилась на лист */
+  .hint{flex:0 0 auto; text-align:center; font-size:11px; color:var(--fg3); padding:0 14px 9px; pointer-events:none}
 
   .readout{
     border-top:1px solid var(--line); background:var(--bg2); padding:10px 14px;
@@ -271,8 +272,8 @@
   <main class="stage">
     <div class="canvasWrap">
       <canvas id="view"></canvas>
-      <div class="hint">перетаскивай — двигает кадр · колесо / щипок — масштаб · двойной клик — сброс</div>
     </div>
+    <div class="hint">перетаскивай — двигает кадр · колесо / щипок — масштаб · двойной клик — сброс</div>
     <div class="readout" id="readout"></div>
   </main>
 </div>
@@ -644,7 +645,7 @@ function renderPreview(){
   const g = geo();
   const wrap = view.parentElement;
   const availW = Math.max(120, wrap.clientWidth  - 32);
-  const availH = Math.max(120, wrap.clientHeight - 42);
+  const availH = Math.max(120, wrap.clientHeight - 32);
   const k = Math.min(availW/g.W, availH/g.H);
   previewScale = k;
 
