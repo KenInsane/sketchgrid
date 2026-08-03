@@ -510,12 +510,12 @@ function svgRenderer(W,H,ox = 0,oy = 0){
     },
     image(im,x,y,w,h,o={}){
       const href = fxDataURL(); if (!href) return;
-      let attrs = '';
-      if (o.clip){
-        const id = 'clp'+(++cid);
-        defs.push(`<clipPath id="${id}"><rect x="${nm(o.clip[0])}" y="${nm(o.clip[1])}" width="${nm(o.clip[2])}" height="${nm(o.clip[3])}"/></clipPath>`);
-        attrs = ` clip-path="url(#${id})"`;
-      }
+      // В векторе обрезаем всегда: сглаживания тут нет, зато вне браузера
+      // без clip картинка вылезет за пределы артборда.
+      const cl = o.clip || [ox, oy, W, H];
+      const id = 'clp'+(++cid);
+      defs.push(`<clipPath id="${id}"><rect x="${nm(cl[0])}" y="${nm(cl[1])}" width="${nm(cl[2])}" height="${nm(cl[3])}"/></clipPath>`);
+      const attrs = ` clip-path="url(#${id})"`;
       const tr = o.flip ? ` transform="translate(${nm(2*(x+w/2))},0) scale(-1,1)"` : '';
       body.push(`<g${attrs}><image href="${href}" x="${nm(x)}" y="${nm(y)}" width="${nm(w)}" height="${nm(h)}" preserveAspectRatio="none"${tr}/></g>`);
     },
