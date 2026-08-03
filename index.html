@@ -559,7 +559,12 @@ function drawSheet(r, g, opt){
   // картинка
   if (withImage){
     const p = placement(g);
-    if (p) r.image(p.img, p.x, p.y, p.w, p.h, {clip:[g.fx,g.fy,g.fw,g.fh], flip:st.flip});
+    // Микровыпуск + отказ от clip в режиме «только клетки»: иначе по краю
+    // остаётся полупрозрачная строка пикселей от сглаживания границы.
+    // В этом режиме обрезку делает сам холст, ровно по кадру.
+    const e = 0.15;
+    if (p) r.image(p.img, p.x-e, p.y-e, p.w+2*e, p.h+2*e,
+                   {clip: bare ? null : [g.fx,g.fy,g.fw,g.fh], flip:st.flip});
     else {
       r.rect(g.fx,g.fy,g.fw,g.fh,{fill:'#f2f2f2'});
       r.text(g.fx+g.fw/2, g.fy+g.fh/2, 'загрузи изображение', {size:5, fill:'#bdbdbd', align:'center', base:'middle'});
