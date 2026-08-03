@@ -224,6 +224,12 @@
 
     <fieldset>
       <legend>5 · Экспорт</legend>
+      <div class="row"><label>Эталон</label>
+        <div class="seg" id="segBare">
+          <button data-v="sheet" class="on">Лист с полями</button>
+          <button data-v="bare">Только клетки</button>
+        </div>
+      </div>
       <div class="row"><label>Плотность</label>
         <select id="dpi" class="grow">
           <option value="150">150 dpi — лёгкий файл</option>
@@ -261,6 +267,7 @@
         <li><b>PNG-эталон</b> → отправь на iPad (iCloud Drive, OneDrive, Telegram, почта) и открой во весь экран.</li>
         <li>Расчерти бумагу по цифрам из строки состояния: отступ от края = поля, дальше шаг = размер клетки. Либо напечатай <b>лист-сетку</b> и рисуй прямо на нём.</li>
         <li>Рисуй по одной клетке: смотришь на <code>B7</code> на экране — рисуешь в <code>B7</code> на бумаге. Сначала обозначь, где линия входит и выходит из клетки, потом соединяй.</li>
+        <li><b>Только клетки</b> в разделе «Экспорт» отдаёт голый кадр с сеткой — без полей, подписей, рамки и нижней строки. Подписи A/1 всё равно резервируют полосу под себя, чтобы число клеток не менялось при переключении; если полоса не нужна — сними галочку «Подписи A/1».</li>
         <li>На листе есть <b>контрольная линейка 10 см</b> — измерь её после печати. Совпало → масштаб верный (печатать «Реальный размер / 100%», не «по размеру страницы»).</li>
       </ol>
     </details>
@@ -296,7 +303,7 @@ const st = {
   color:'#ffffff', width:0.3, alpha:0.85,
   gray:false, flip:false, contrast:0, poster:0,
   fit:'cover', zoom:1, panX:0, panY:0, rot:0,
-  dpi:300, fmt:'jpeg', ticksOnly:false
+  dpi:300, fmt:'jpeg', ticksOnly:false, bare:false
 };
 const DEFAULTS = Object.freeze({...st});   // снимок до восстановления из localStorage
 
@@ -336,6 +343,12 @@ function geo(){
   const fx = ux + (uw - fw)/2;
   const fy = uy + (uh - fh)/2;
   return {W,H,m,lab,cell,cols,rows,fw,fh,fx,fy, footerTop: H - m - FOOTER};
+}
+
+/* Что именно выгружаем: весь лист или только кадр с клетками */
+function box(g, bare){
+  return bare ? {w:g.fw, h:g.fh, x:g.fx, y:g.fy}
+              : {w:g.W,  h:g.H,  x:0,    y:0};
 }
 
 /* ============================================================
@@ -436,8 +449,8 @@ function ty(y, size, base){
   return y; // alphabetic / bottom
 }
 
-function canvasRenderer(ctx, k){
-  ctx.setTransform(k,0,0,k,0,0);
+function canvasRenderer(ctx, k, ox = 0, oy = 0){
+  ctx.setTransform(k,0,0,k,-ox*k,-oy*k);
   ctx.lineCap = 'butt';
   const FONT = '"Inter","Segoe UI",Arial,sans-serif';
   return {
@@ -478,7 +491,7 @@ function canvasRenderer(ctx, k){
   };
 }
 
-function svgRenderer(W,H){
+function svgRenderer(W,H,ox = 0,oy = 0){
   const body = []; const defs = []; let cid = 0;
   const FONT = "Inter, 'Segoe UI', Arial, sans-serif";
   const al = a => (a===undefined||a===1) ? '' : ` opacity="${nm(a)}"`;
@@ -508,7 +521,7 @@ function svgRenderer(W,H){
     },
     done(){
       return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" `
-        + `width="${nm(W)}mm" height="${nm(H)}mm" viewBox="0 0 ${nm(W)} ${nm(H)}">`
+        + `width="${nm(W)}mm" height="${nm(H)}mm" viewBox="${nm(ox)} ${nm(oy)} ${nm(W)} ${nm(H)}">`
         + (defs.length ? `<defs>${defs.join('')}</defs>` : '')
         + body.join('') + `</svg>`;
     }
@@ -531,6 +544,7 @@ function fmt(v, d=1){
 function drawSheet(r, g, opt){
   const withImage = !!opt.withImage;
   const paperMode = !!opt.paperMode;      // пустой лист для бумаги
+  const bare      = !!opt.bare;           // только кадр с клетками, без полей и подписей
   const ticks     = paperMode && st.ticksOnly;
 
   const gc   = paperMode ? '#808080' : st.color;
@@ -538,8 +552,9 @@ function drawSheet(r, g, opt){
   const gw   = paperMode ? Math.max(0.18, st.width*0.7) : st.width;
   const inkD = '#111111', inkM = '#5c5c5c';
 
-  // бумага
-  r.rect(0,0,g.W,g.H,{fill:'#ffffff'});
+  // подложка: либо весь лист, либо только кадр
+  if (bare) r.rect(g.fx,g.fy,g.fw,g.fh,{fill:'#ffffff'});
+  else      r.rect(0,0,g.W,g.H,{fill:'#ffffff'});
 
   // картинка
   if (withImage){
@@ -585,6 +600,9 @@ function drawSheet(r, g, opt){
     r.line(g.fx+g.fw/2,g.fy,g.fx+g.fw/2,g.fy+g.fh,{stroke:gc,width:gw*1.6,alpha:ga*0.8});
     r.line(g.fx,g.fy+g.fh/2,g.fx+g.fw,g.fy+g.fh/2,{stroke:gc,width:gw*1.6,alpha:ga*0.8});
   }
+
+  // «Только клетки»: дальше идут рамка, подписи и нижняя полоса — они не нужны
+  if (bare) return;
 
   // рамка
   r.rect(g.fx,g.fy,g.fw,g.fh,{stroke:paperMode?'#404040':gc, width:gw*2, alpha:paperMode?0.9:Math.min(1,ga+0.15)});
@@ -646,18 +664,19 @@ function renderPreview(){
   const wrap = view.parentElement;
   const availW = Math.max(120, wrap.clientWidth  - 32);
   const availH = Math.max(120, wrap.clientHeight - 32);
-  const k = Math.min(availW/g.W, availH/g.H);
+  const b = box(g, st.bare);
+  const k = Math.min(availW/b.w, availH/b.h);
   previewScale = k;
 
   const dpr = Math.min(2.5, window.devicePixelRatio || 1);
-  view.style.width  = (g.W*k) + 'px';
-  view.style.height = (g.H*k) + 'px';
-  view.width  = Math.round(g.W*k*dpr);
-  view.height = Math.round(g.H*k*dpr);
+  view.style.width  = (b.w*k) + 'px';
+  view.style.height = (b.h*k) + 'px';
+  view.width  = Math.round(b.w*k*dpr);
+  view.height = Math.round(b.h*k*dpr);
 
   vctx.setTransform(1,0,0,1,0,0);
   vctx.clearRect(0,0,view.width,view.height);
-  drawSheet(canvasRenderer(vctx, k*dpr), g, {withImage:true});
+  drawSheet(canvasRenderer(vctx, k*dpr, b.x, b.y), g, {withImage:true, bare:st.bare});
   vctx.setTransform(1,0,0,1,0,0);
 
   updateReadout(g);
@@ -666,7 +685,8 @@ function renderPreview(){
 function updateReadout(g){
   const pxmm = st.dpi/25.4;
   const cellPx = g.cell*pxmm;
-  const outW = Math.round(g.W*pxmm), outH = Math.round(g.H*pxmm);
+  const b = box(g, st.bare);
+  const outW = Math.round(b.w*pxmm), outH = Math.round(b.h*pxmm);
   const mpx = (outW*outH/1e6);
   const heavy = mpx > 45;
 
@@ -675,7 +695,7 @@ function updateReadout(g){
     ['','сетка', `${g.cols} × ${g.rows} клеток`],
     ['','кадр на бумаге', `${fmt(g.fw)} × ${fmt(g.fh)} мм`],
     ['','1 см', `${Math.round(10*pxmm)} px @ ${st.dpi} dpi`],
-    ['','лист', `${fmt(g.W)} × ${fmt(g.H)} мм`],
+    ['','лист', st.bare ? 'только клетки' : `${fmt(g.W)} × ${fmt(g.H)} мм`],
     ['','файл на выходе', `${outW} × ${outH} px${heavy?' ⚠':''}`],
   ];
   $('#readout').innerHTML = stats.map(([c,i,b]) =>
@@ -691,8 +711,9 @@ let pinch = null;
 
 function toMM(e){
   const r = view.getBoundingClientRect();
-  const g = geo();
-  return { x:(e.clientX - r.left)/r.width*g.W, y:(e.clientY - r.top)/r.height*g.H };
+  const b = box(geo(), st.bare);
+  return { x: b.x + (e.clientX - r.left)/r.width*b.w,
+           y: b.y + (e.clientY - r.top )/r.height*b.h };
 }
 function zoomAt(px, py, f){
   const g = geo();
@@ -815,9 +836,10 @@ window.addEventListener('paste', e => {
 function renderToCanvas(dpi, opt){
   const g = geo();
   const k = dpi/25.4;
+  const b = box(g, opt.bare);
   const c = document.createElement('canvas');
-  c.width  = Math.round(g.W*k);
-  c.height = Math.round(g.H*k);
+  c.width  = Math.round(b.w*k);
+  c.height = Math.round(b.h*k);
   // браузер молча отдаёт пустой холст, если превысить лимит — лучше сказать прямо
   if (c.width*c.height > 120e6 || Math.max(c.width,c.height) > 16000){
     alert(`Слишком крупный экспорт: ${c.width}×${c.height} px.\nВыбери плотность пониже (150 или 254 dpi).`);
@@ -825,14 +847,15 @@ function renderToCanvas(dpi, opt){
   }
   const x = c.getContext('2d');
   x.fillStyle = '#fff'; x.fillRect(0,0,c.width,c.height);
-  drawSheet(canvasRenderer(x, k), g, opt);
+  drawSheet(canvasRenderer(x, k, b.x, b.y), g, opt);
   x.setTransform(1,0,0,1,0,0);
-  return {canvas:c, g};
+  return {canvas:c, g, box:b};
 }
 
 function baseName(){
   const g = geo();
-  return `grid_${st.paper}_${st.orient==='portrait'?'P':'L'}_${fmt(g.cell)}mm_${g.cols}x${g.rows}`;
+  return `grid_${st.paper}_${st.orient==='portrait'?'P':'L'}_${fmt(g.cell)}mm_${g.cols}x${g.rows}`
+       + (st.bare ? '_bare' : '_sheet');
 }
 function download(blobOrUrl, name){
   const a = document.createElement('a');
@@ -843,10 +866,10 @@ function download(blobOrUrl, name){
 }
 
 $('#dlPng').addEventListener('click', () => {
-  const r = renderToCanvas(st.dpi, {withImage:true}); if (!r) return;
+  const r = renderToCanvas(st.dpi, {withImage:true, bare:st.bare}); if (!r) return;
   const canvas = r.canvas;
   const jpg = st.fmt === 'jpeg';
-  canvas.toBlob(b => download(b, baseName()+'_ref.'+(jpg?'jpg':'png')),
+  canvas.toBlob(b => download(b, baseName()+'.'+(jpg?'jpg':'png')),
                 jpg ? 'image/jpeg' : 'image/png', jpg ? 0.9 : undefined);
 });
 
@@ -858,24 +881,24 @@ $('#dlSvg').addEventListener('click', () => {
 });
 
 $('#dlSvgRef').addEventListener('click', () => {
-  const g = geo();
-  const r = svgRenderer(g.W, g.H);
-  drawSheet(r, g, {withImage:true});
-  download(new Blob([r.done()], {type:'image/svg+xml'}), baseName()+'_ref.svg');
+  const g = geo(), b = box(g, st.bare);
+  const r = svgRenderer(b.w, b.h, b.x, b.y);
+  drawSheet(r, g, {withImage:true, bare:st.bare});
+  download(new Blob([r.done()], {type:'image/svg+xml'}), baseName()+'.svg');
 });
 
 function printSheet(opt){
   const res = renderToCanvas(Math.min(st.dpi, 300), opt); if (!res) return;
-  const {canvas, g} = res;
-  $('#pageStyle').textContent = `@page{ size:${nm(g.W)}mm ${nm(g.H)}mm; margin:0 }`;
+  const {canvas, box:b} = res;
+  $('#pageStyle').textContent = `@page{ size:${nm(b.w)}mm ${nm(b.h)}mm; margin:0 }`;
   const root = $('#printRoot');
-  root.innerHTML = `<img src="${canvas.toDataURL('image/png')}" style="width:${nm(g.W)}mm;height:${nm(g.H)}mm">`;
+  root.innerHTML = `<img src="${canvas.toDataURL('image/png')}" style="width:${nm(b.w)}mm;height:${nm(b.h)}mm">`;
   const img = root.querySelector('img');
   const go = () => setTimeout(() => { window.print(); }, 60);
   if (img.complete) go(); else img.onload = go;
 }
-$('#prRef').addEventListener('click',   () => printSheet({withImage:true}));
-$('#prPaper').addEventListener('click', () => printSheet({withImage:false, paperMode:true}));
+$('#prRef').addEventListener('click',   () => printSheet({withImage:true, bare:st.bare}));
+$('#prPaper').addEventListener('click', () => printSheet({withImage:false, paperMode:true, bare:false}));
 window.addEventListener('afterprint', () => { $('#printRoot').innerHTML = ''; });
 
 /* ============================================================
@@ -925,6 +948,14 @@ $('#fPoster').addEventListener('change', () => { st.poster = +$('#fPoster').valu
 $('#dpi').addEventListener('change', () => { st.dpi = +$('#dpi').value; renderPreview(); save(); });
 $('#fileFmt').addEventListener('change', () => { st.fmt = $('#fileFmt').value; renderPreview(); save(); });
 
+/* «Только клетки» — булев, поэтому свой обработчик, а не общий seg() */
+$('#segBare').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  [...$('#segBare').children].forEach(c => c.classList.toggle('on', c === b));
+  st.bare = b.dataset.v === 'bare';
+  renderPreview(); save();
+});
+
 chk('#gLabels','labels'); chk('#gSub','sub'); chk('#gDiag','diag'); chk('#gCenter','center');
 chk('#fGray','gray', () => fxCache.key = null);
 chk('#fFlip','flip');
@@ -969,6 +1000,7 @@ function restore(){
 
   const mark = (id,key) => [...$(id).children].forEach(b => b.classList.toggle('on', b.dataset.v === st[key]));
   mark('#segFit','fit'); mark('#segOrient','orient'); mark('#segMode','mode');
+  [...$('#segBare').children].forEach(b => b.classList.toggle('on', (b.dataset.v === 'bare') === !!st.bare));
 }
 
 $('#resetAll').addEventListener('click', () => {
